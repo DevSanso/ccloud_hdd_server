@@ -1,66 +1,86 @@
 package object
 
 import (
-	"os"
+	"context"
+	"crypto/cipher"
+	"errors"
 	"github.com/spf13/afero"
-	"path/filepath"
+
+	"github.com/mattn/go-sqlite3"
 )
 
-
+const TokenSize = 4096
+var ClosedChanErr = errors.New("channel close")
+var CantUseMethodErr = errors.New("this method not allow")
 type Object struct {
-	phy afero.Fs
+	f afero.File
 }
 
-var dataRootPath string
-
-func getRootPath() string {return dataRootPath}
-func objectPath(path string) string {return filepath.FromSlash(dataRootPath + "/"+ path)}
-
-func setRootPath(path string) {
-	dataRootPath = path
+type ObjChannel struct {
+	channel chan []byte
+	wFlag bool //ture : write ,false : read
+	cancel context.CancelFunc
+	err map[int]error
+}
+func (ch *ObjChannel)appendErr(key int,err error) {
+	ch.err[key] = err
 }
 
-func NewObject(name string) *Object {
-	return &Object{
-		afero.NewBasePathFs(afero.NewOsFs(),objectPath(name)),
+func (ch *ObjChannel)FreeErr(key int) {
+	delete(ch.err,key)
+}
+func (ch *ObjChannel)AsyncRead() ([]byte) {
+	if ch.wFlag {return nil}
+
+	var data []byte = nil
+	select {
+	case buf,ok := <-ch.channel:
+		if !ok {return nil}
+		data = buf
 	}
+	return data
 }
 
-func (obj *Object) UploadAll(filename string, data []byte) error {
-	f,err := obj.phy.OpenFile(filename, os.O_TRUNC | os.O_WRONLY ,os.FileMode(0644))
-	if err != nil {return err}
-	defer f.Close()
+func (ch *ObjChannel)AsyncWrite(b []byte) ([]byte,error) {
+	if !ch.wFlag {return nil,CantUseMethodErr}
+	ch.channel <- b
 
-	_,err = f.Write(data)
-	return err
 }
 
-func (obj *Object) Delete(filename string) error  {
-	return obj.phy.Remove(filename)
+func NewObject(f afero.File) Object {
+	return Object{f}
 }
 
-func (obj *Object) Create(filename string) error {
-	f,err:= obj.phy.Create(filename)
-	if err != nil {return err}
-	return f.Close()
+func (o *Object)MakeReadChan(cryp cipher.Block) (<-chan []byte,context.CancelFunc,error) {
+	stat,err := o.f.Stat()
+	if err != nil {return nil,nil,err}
+
+	channel := make(chan []byte)
+	ctx,cancel := context.WithCancel(context.Background())
+
+	go func() {
+		var max = stat.Size()
+		var offset int64 = 0
+		var buf = make([]byte,TokenSize)
+
+		for offset < max{
+			select {
+			case <-ctx.Done():
+				break
+			default:
+				o.f.ReadAt(buf,offset)
+			}
+		}
+
+
+		close(channel)
+	}()
+	
+
+	return channel,cancel,nil
 }
-func (obj *Object) GetAll(filename string) ([]byte,error) {
-	f,err := obj.phy.Open(filename)
-	if err != nil {return nil,err}
-	defer f.Close()
 
-	var info os.FileInfo
-	info,err = f.Stat()
-	if err != nil {return nil,err}
 
-	var data = make([]byte,info.Size())
-	_,err = f.Read(data)
-	if err != nil {return nil,err}
-
-	return data,nil
-}
-
-func (obj *Object)
 
 
 
