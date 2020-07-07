@@ -6,6 +6,6 @@ import (
 
 
 type Worker interface {
-	Do(w http.ResponseWriter,r *http.Request,next Worker)
+	Do(w http.ResponseWriter,r *http.Request,key []byte)
 }
 
