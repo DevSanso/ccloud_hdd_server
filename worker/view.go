@@ -31,13 +31,13 @@ func convertFI(finfo os.FileInfo,dir_path string) _FileInfo {
 }
 
 
-func (v *ViewDir) Do(w http.ResponseWriter,r *http.Request,next Worker) {
+func (v *ViewDir) Do(w http.ResponseWriter,r *http.Request,key []byte) {
 	if r.Method != "GET" {
-		w.WriteHeader(400)
+		w.WriteHeader(404)
 		return
 	}
 	dirPath := r.URL.Query().Get("dir")
-
+	
 	if !db.ExistDir(dirPath) {
 		w.WriteHeader(404)
 		return
@@ -51,10 +51,14 @@ func (v *ViewDir) Do(w http.ResponseWriter,r *http.Request,next Worker) {
 	}
 	var buf = new(bytes.Buffer)
 	var encoder = json.NewEncoder(buf)
-
-	for _,info := range(iList)  {
-		if err = encoder.Encode(convertFI(info,dirPath));err != nil {break}
+	
+	var res struct {
+		Arr []_FileInfo
 	}
+	for _,i := range(iList)  {
+		res.Arr = append(res.Arr,convertFI(i,dirPath))
+	}
+	err = encoder.Encode(res.Arr)
 	if err != nil {
 		w.WriteHeader(500)
 		return
@@ -63,7 +67,6 @@ func (v *ViewDir) Do(w http.ResponseWriter,r *http.Request,next Worker) {
 	w.Header().Set("content-type","application/json")
 	w.Write(buf.Bytes())
 	w.WriteHeader(200)
-
 }
 
-type FileIconView struct {}
+
