@@ -18,3 +18,7 @@ func ExistDir(path string)bool {
 func GetDirFiles(path string) ([]os.FileInfo,error) {
 	
 }
+
+func ExistFile(dirpath,filename string) bool {
+	
+}
