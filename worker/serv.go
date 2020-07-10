@@ -22,6 +22,7 @@ type FileMeta struct{
 }
 type FileDataServ struct {}
 
+
 func (fvs *FileDataServ)Do(w http.ResponseWriter,r *http.Request,key []byte) {
 	fileName := r.URL.Query().Get("file")
 	dirPath := r.URL.Query().Get("dir")

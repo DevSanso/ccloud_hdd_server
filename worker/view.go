@@ -1,7 +1,7 @@
 package worker
 
 import (
-	"ccloud_hdd_server/db"
+	"ccloud_hdd_server/data"
 	"encoding/json"
 	"bytes"
 	"path/filepath"
@@ -38,13 +38,13 @@ func (v *ViewDir) Do(w http.ResponseWriter,r *http.Request,key []byte) {
 	}
 	dirPath := r.URL.Query().Get("dir")
 	
-	if !db.ExistDir(dirPath) {
+	if !data.ExistDir(dirPath) {
 		w.WriteHeader(404)
 		return
 	}
 	
 
-	iList,err := db.GetDirFiles(dirPath)
+	iList,err := data.GetDirFiles(dirPath)
 	if err != nil {
 		w.WriteHeader(500)
 		return
