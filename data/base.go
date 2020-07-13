@@ -3,25 +3,34 @@ package data
 
 import (
 	"github.com/spf13/afero"
-	"path/filepath"
+	"os"
 )
 
-func GetBasePath() string {
-	const baseP = "./datas"
-	p,_ :=filepath.Abs(filepath.FromSlash(baseP))
-	return p
+type RootFs struct {
+	rd afero.Fs
 }
 
-var base = afero.NewBasePathFs(afero.NewOsFs(),GetBasePath())
 
+func NewRootFs(path string) RootFs {
 
-type rootData struct {fs afero.Fs}
-var rd = rootData{base}
-func (rd *rootData)getObject(key []byte,path string) (*Object,error) {
+}
+
+func (rd *RootFs)ExistDir(path string)bool {
 	
 }
 
 
-func GetObject(key []byte,path string) (*Object,error) {
-	return rd.getObject(key,path)
+
+
+func (rd *RootFs)GetDirFiles(path string) ([]os.FileInfo,error) {
+	
 }
+
+func (rd *RootFs)ExistFile(dirpath,filename string) bool {
+	
+}
+
+
+
+
+
