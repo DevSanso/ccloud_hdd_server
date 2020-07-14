@@ -43,3 +43,20 @@ func InsertPassword(conn *sql.Conn,passwd string) error  {
 	_,err := conn.QueryContext(context.Background(),_InsertPasswdSql,p_hash)
 	return err
 }
+
+func GetUserId(conn *sql.Conn,passwdHash []byte) (int,error) {
+
+}
+
+func GetBasePathId(conn *sql.Conn,userID int) (int,error) {
+
+}
+
+type UserIdAndBaseId struct {
+	UserId int
+	BaseId int
+}
+
+func GetUserAndBaseId(conn *sql.Conn,passwdHash []byte) (UserIdAndBaseId,error) {
+	
+}
