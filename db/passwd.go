@@ -3,19 +3,19 @@ package db
 import (
 	"database/sql"
 	"context"
-	"crypto/md5"
-	"crypto/sha256"
-	"hash"
-
 
 	_ "github.com/go-sql-driver/mysql"
+
+
+	hash "ccloud_hdd_server/use-hash"
 )
 
 
 const (
-_InsertUserPwSql = "INSERT INTO user(p_hash) VALUES(?);"
+	_InsertUserPwSql = "INSERT INTO user(p_hash) VALUES(?);"
 	_InsertUserBaseSql = "INSERT INTO user(base_id) VALUES(?) WHERE id = ?;"
-	_SelectUserSql = "SELECT index FROM user WHERE pw = ?;"
+	_SelectUserSql = "SELECT id FROM user WHERE pw = ?;"
+	_SelectUserBaseIdSql = "SELECT base_id FROM user WHERE id = ?;"
 	_CreateUserTableSql = "CREATE TABLE user(" +
 							"id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY," + 
 							"p_hash CHAR(32) NOT NULL," +
@@ -23,40 +23,29 @@ _InsertUserPwSql = "INSERT INTO user(p_hash) VALUES(?);"
 )
 
 
-type _HashDecryption struct {}
-func (*_HashDecryption)first() hash.Hash {
-	return md5.New()
-}
-func (*_HashDecryption)second() hash.Hash {
-	return sha256.New()
-}
-
-var _hd = _HashDecryption{}
 
 
 
-func InsertPassword(conn *sql.Conn,passwd string) error  {
-	p_pass := []byte(passwd)
-	f := _hd.first()
-	s := _hd.second()
-	p_hash := s.Sum(f.Sum(p_pass))
-	_,err := conn.QueryContext(context.Background(),_InsertPasswdSql,p_hash)
+
+func InsertPassword(conn *sql.Conn,passwdString string) error  {
+	p_pass := []byte(passwdString)
+	p_hash := hash.Sum(p_pass)
+
+	_,err := conn.QueryContext(context.Background(),_InsertUserPwSql,p_hash)
 	return err
 }
 
 func GetUserId(conn *sql.Conn,passwdHash []byte) (int,error) {
-
+	row := conn.QueryRowContext(context.Background(),_SelectUserSql,passwdHash)
+	var res int = 0
+	err := row.Scan(&res)
+	return res,err
 }
 
 func GetBasePathId(conn *sql.Conn,userID int) (int,error) {
-
+	row := conn.QueryRowContext(context.Background(),_SelectUserBaseIdSql,userID)
+	var res int = 0
+	err := row.Scan(&res)
+	return res,err
 }
 
-type UserIdAndBaseId struct {
-	UserId int
-	BaseId int
-}
-
-func GetUserAndBaseId(conn *sql.Conn,passwdHash []byte) (UserIdAndBaseId,error) {
-	
-}
