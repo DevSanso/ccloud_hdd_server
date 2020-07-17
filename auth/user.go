@@ -1,4 +1,4 @@
-package user
+package auth
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/scylladb/go-set/u32set"
 
-	"ccloud_hdd_server/db"
+	"ccloud_hdd_server/db_sql"
 )
 
 
@@ -34,7 +34,7 @@ var sessionKeySet = u32set.New()
 var timeOut = time.Hour * 24
 
 func Login(conn *sql.Conn,passwd []byte) (uint32,error) {
-	u_id,err := db.GetUserId(conn,passwd)
+	u_id,err := db_sql.GetUserId(conn,passwd)
 	if err != nil {return 0,err}
 
 	key := makeSessionKey()
