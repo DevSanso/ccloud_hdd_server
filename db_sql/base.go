@@ -3,7 +3,6 @@ package db_sql
 import (
 	"database/sql"
 	"context"
-	_ "github.com/go-sql-driver/mysql"
 )
 
 const (

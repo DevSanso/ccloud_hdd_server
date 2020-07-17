@@ -4,17 +4,15 @@ import (
 	"database/sql"
 	"context"
 
-	_ "github.com/go-sql-driver/mysql"
 
-
-	hash "ccloud_hdd_server/use-hash"
+	hash "ccloud_hdd_server/use_hash"
 )
 
 
 const (
 	_InsertUserPwSql = "INSERT INTO user(p_hash) VALUES(?);"
 	_InsertUserBaseSql = "INSERT INTO user(base_id) VALUES(?) WHERE id = ?;"
-	_SelectUserSql = "SELECT id FROM user WHERE pw = ?;"
+	_SelectUserSql = "SELECT id FROM user WHERE p_hash = ?;"
 	_SelectUserBaseIdSql = "SELECT base_id FROM user WHERE id = ?;"
 	_CreateUserTableSql = "CREATE TABLE user(" +
 							"id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY," + 
@@ -42,10 +40,12 @@ func GetUserId(conn *sql.Conn,passwdHash []byte) (int,error) {
 	return res,err
 }
 
-func GetBasePathId(conn *sql.Conn,userID int) (int,error) {
-	row := conn.QueryRowContext(context.Background(),_SelectUserBaseIdSql,userID)
+func GetBasePathId(conn *sql.Conn,userId int) (int,error) {
+	row := conn.QueryRowContext(context.Background(),_SelectUserBaseIdSql,userId)
 	var res int = 0
 	err := row.Scan(&res)
 	return res,err
 }
+
+
 
