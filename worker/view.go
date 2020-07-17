@@ -31,6 +31,7 @@ func convertFI(finfo os.FileInfo,dir_path string) _FileInfo {
 }
 
 
+
 func (v *ViewDir) Do(w http.ResponseWriter,r *http.Request,key []byte) {
 	if r.Method != "GET" {
 		w.WriteHeader(404)

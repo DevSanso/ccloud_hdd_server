@@ -1,13 +1,20 @@
 package worker
 
 import (
-	"ccloud_hdd_server/db"
-	"ccloud_hdd_server/data"
+	"context"
 	"encoding/json"
-	"bytes"
-	"path/filepath"
 	"net/http"
+
+	"path/filepath"
+	"strconv"
+
 	"github.com/gorilla/websocket"
+	"github.com/spf13/afero"
+
+	"ccloud_hdd_server/auth"
+	"ccloud_hdd_server/data"
+	"ccloud_hdd_server/db_sql"
+	"ccloud_hdd_server/get_db"
 )
 
 func mergePath(dir, file string)string {
@@ -21,44 +28,78 @@ type FileMeta struct{
 	FullSize int64
 }
 type FileDataServ struct {}
+func (fvs *FileDataServ)notLoginResponse(w http.ResponseWriter) {
+	w.Header().Set("content-type","text/plain")
+	w.Write([]byte("not login"))
+	w.WriteHeader(400)
+}
 
+func (fvs *FileDataServ)badCookieValueResponse(w http.ResponseWriter) {
+	w.Header().Set("content-type","text/plain")
+	w.Write([]byte("bad cookie"))
+	w.WriteHeader(400)
+}
+func (fvs *FileDataServ)cantSearchDataResponse(w http.ResponseWriter) {
+	w.Header().Set("content-type","text/plain")
+	w.Write([]byte("can't search data"))
+	w.WriteHeader(404)
+}
+func (fvs *FileDataServ)cantStartWSLoopResponse(w http.ResponseWriter) {
+	w.Header().Set("content-type","text/plain")
+	w.Write([]byte("can't websocket run"))
+	w.WriteHeader(500)
+}
+
+func (fvs *FileDataServ)getUserBaseId(key int) (int,error) {
+	c,err := get_db.GetDbConn(context.Background())
+	if err != nil {return 0,err}
+	defer c.Close()
+
+	return db_sql.GetBasePathId(c,key)
+
+}
+func (fvs *FileDataServ)getObjectHeader(path string)(db_sql.Header,error) {
+	c,err := get_db.GetDbConn(context.Background())
+	if err != nil {return nil,err}
+	defer c.Close()
+	return db_sql.LoadObjectHeader(c,path)
+}
 
 func (fvs *FileDataServ)Do(w http.ResponseWriter,r *http.Request,key []byte) {
-	fileName := r.URL.Query().Get("file")
-	dirPath := r.URL.Query().Get("dir")
-	if !db.ExistFile(dirPath,fileName) {
-		w.WriteHeader(404)
-		return
+	ck,ck_err := r.Cookie("session")
+	if ck_err != nil {fvs.notLoginResponse(w);return}
+	var using_key int
+	using_key,ck_err = strconv.Atoi(ck.Value)
+
+	if ck_err != nil {fvs.badCookieValueResponse(w);return}
+	if using_key,ck_err =auth.GetUesrId(uint32(using_key));ck_err != nil {
+		fvs.badCookieValueResponse(w)
+		return;
 	}
 
-	obj,objErr := data.GetObject(key,mergePath(dirPath,fileName))
-	if objErr != nil {
-		w.WriteHeader(500)
-		return
-	}
+	
+
+
+	file_name := r.URL.Query().Get("file")
+	dir_path := r.URL.Query().Get("dir")
+
+	header,db_err := fvs.getObjectHeader(dir_path+"/"+file_name)
+	if db_err != nil {fvs.cantSearchDataResponse(w);return}
+
+	fs := afero.NewBasePathFs(afero.NewOsFs(),header.BaseDir())
+	path := filepath.Join(header.SubDir(),header.Name())
+	f,f_err :=fs.Open(path)
+	if f_err != nil {fvs.badCookieValueResponse(w);return}
 
 	upgrader := websocket.Upgrader{}
-	conn ,err := upgrader.Upgrade(w,r,nil)
-	if err != nil {
-		w.WriteHeader(500)
-		return
-	}
-	fvs.loop(conn,obj)
+	ws_conn ,ws_err := upgrader.Upgrade(w,r,nil)
+	if ws_err != nil {fvs.cantStartWSLoopResponse(w);return}
+	fvs.loop(ws_conn,f)
 	
 }
-func(fvs *FileDataServ)loop(conn *websocket.Conn,obj *data.Object) {
-	channel,cancel := obj.ReadChan()
-	conn.SetCloseHandler(func(code int,text string) error {
+func(fvs *FileDataServ)loop(conn *websocket.Conn,f afero.File) {
+	for {
 
-	})
-
-	for i := int64(0); i < obj.Size(); {
-		data,ok:=<-channel
-		if !ok {
-			
-			break
-		}
-		if err := conn.ReadJSON(data);err != nil {cancel();break}
 	}
 }
 
