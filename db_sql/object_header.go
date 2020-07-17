@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	hash "ccloud_hdd_server/use-hash"
+	hash "ccloud_hdd_server/use_hash"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 	_DeleteObjectHeaderSql = "DELTE FROM object_table WHERE name = ?;"
 
 
-	_SelectObjectHeaderSql = "SELECT * FROM object_table WHERE name = ? LIMIT 1;"
+	_SelectObjectHeaderSql = "SELECT * FROM object_table WHERE sub_dir = ? AND name = ?   LIMIT 1;"
 
 	_CreateObjectHeaderTableSql =  "CREATE TABLE object_table ("+
 		"name VARCHAR(256) NOT NULL PRIMARY KEY,"+
@@ -46,17 +46,19 @@ var (
 
 type Header interface {
 	os.FileInfo
-	DirPath() string
+	SubDir() string
+	BaseDir() string
 	TokenSize() int
 	HashName() []byte
 	UpdateValue(conn *sql.Conn,column HeaderColumn,value interface{})error
 }
 
 type objectHeader struct {
+	//수정 불가능
 	name string
+	//수정 불가능
 	basePath string
 	subDirPath string
-
 	//수정 불가능
 	tokenSize int
 	//본래의 파일 사이즈,하드에 있는 파일사이즈랑 다름
@@ -100,8 +102,16 @@ func CreateObjectHeader(conn *sql.Conn,name string,cfg *ObjectConfig) (Header,er
 		cfg.Date,
 	},nil
 }
-func LoadObjectHeader(conn *sql.Conn,name string) (Header,error) {
-	row := conn.QueryRowContext(context.Background(),_SelectObjectHeaderSql,name)
+
+func splitPath(path string) (name string,subDir string) {
+	name = filepath.Base(path)
+	subDir = filepath.Dir(subDir)
+	return
+}
+
+func LoadObjectHeader(conn *sql.Conn,path string) (Header,error) {
+	name,sub_dir := splitPath(path)
+	row := conn.QueryRowContext(context.Background(),_SelectObjectHeaderSql,name,sub_dir)
 	var res struct {
 		sub_dir string
 		base_id int
@@ -141,9 +151,8 @@ func (oh *objectHeader)Mode() os.FileMode {return os.FileMode(0)}
 func (ob *objectHeader)ModTime() time.Time {return ob.date}
 func (*objectHeader)IsDir() bool {return false}
 func (*objectHeader)Sys() interface{} {return nil}
-func (ob *objectHeader)DirPath() string {
-	return filepath.FromSlash(ob.basePath + "/" + ob.subDirPath)
-}
+func (ob *objectHeader)BaseDir() string {return filepath.FromSlash(ob.basePath)}
+func (ob *objectHeader)SubDir() string {return filepath.FromSlash(ob.subDirPath)}
 func (ob *objectHeader)TokenSize() int {return ob.tokenSize}
 func (ob *objectHeader)HashName() []byte {
 	return hash.Sum([]byte(ob.name))
