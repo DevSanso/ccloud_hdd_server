@@ -7,10 +7,12 @@ import (
 	"io"
 	"crypto/cipher"
 	"errors"
+
+	"github.com/spf13/afero"
 )
 
 
-const FileMode = os.FileMode(0)
+
 const (
 	AES256 = iota + 1
 	DES
@@ -22,7 +24,7 @@ var (
 	NotMatchArraySizeError = errors.New("NotMatchArraySizeError")
 )
 type Object struct {
-	f *os.File
+	f afero.File
 	key []byte
 	iv []byte
 	cryt byte
@@ -30,9 +32,8 @@ type Object struct {
 	dataSize int64
 }
 
-func newObject(path string,key []byte,iv []byte,cryt byte,tokenSize,dataSize int64,flag int) (Object,error) {
-	f,err := os.OpenFile(path,flag,FileMode)
-	if err != nil {return Object{nil,nil,nil,0,0,0},err}
+func NewObject(f afero.File,key []byte,iv []byte,cryt byte,tokenSize,dataSize int64) (Object,error) {
+	
 	return Object{f,key,iv,cryt,tokenSize,dataSize},nil
 }
 
