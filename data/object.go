@@ -3,7 +3,6 @@ package data
 import (
 	"crypto/aes"
 	"crypto/des"
-	"os"
 	"io"
 	"crypto/cipher"
 	"errors"
