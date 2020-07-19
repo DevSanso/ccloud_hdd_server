@@ -15,6 +15,7 @@ import (
 	"ccloud_hdd_server/data"
 	"ccloud_hdd_server/db_sql"
 	"ccloud_hdd_server/get_db"
+	err_msg "ccloud_hdd_server/worker/internal"
 )
 
 func mergePath(dir, file string)string {
@@ -28,27 +29,7 @@ type FileMeta struct{
 	FullSize int64
 }
 type FileDataServ struct {}
-func (fvs *FileDataServ)notLoginResponse(w http.ResponseWriter) {
-	w.Header().Set("content-type","text/plain")
-	w.Write([]byte("not login"))
-	w.WriteHeader(400)
-}
 
-func (fvs *FileDataServ)badCookieValueResponse(w http.ResponseWriter) {
-	w.Header().Set("content-type","text/plain")
-	w.Write([]byte("bad cookie"))
-	w.WriteHeader(400)
-}
-func (fvs *FileDataServ)cantSearchDataResponse(w http.ResponseWriter) {
-	w.Header().Set("content-type","text/plain")
-	w.Write([]byte("can't search data"))
-	w.WriteHeader(404)
-}
-func (fvs *FileDataServ)cantStartWSLoopResponse(w http.ResponseWriter) {
-	w.Header().Set("content-type","text/plain")
-	w.Write([]byte("can't websocket run"))
-	w.WriteHeader(500)
-}
 
 func (fvs *FileDataServ)getUserBaseId(key int) (int,error) {
 	c,err := get_db.GetDbConn(context.Background())
@@ -67,13 +48,13 @@ func (fvs *FileDataServ)getObjectHeader(path string)(db_sql.Header,error) {
 
 func (fvs *FileDataServ)Do(w http.ResponseWriter,r *http.Request,key []byte) {
 	ck,ck_err := r.Cookie("session")
-	if ck_err != nil {fvs.notLoginResponse(w);return}
+	if ck_err != nil {err_msg.NotLoginResponse(w);return}
 	var using_key int
 	using_key,ck_err = strconv.Atoi(ck.Value)
 
-	if ck_err != nil {fvs.badCookieValueResponse(w);return}
+	if ck_err != nil {err_msg.BadCookieValueResponse(w);return}
 	if using_key,ck_err =auth.GetUesrId(uint32(using_key));ck_err != nil {
-		fvs.badCookieValueResponse(w)
+		err_msg.BadCookieValueResponse(w)
 		return;
 	}
 
@@ -84,20 +65,20 @@ func (fvs *FileDataServ)Do(w http.ResponseWriter,r *http.Request,key []byte) {
 	dir_path := r.URL.Query().Get("dir")
 
 	header,db_err := fvs.getObjectHeader(dir_path+"/"+file_name)
-	if db_err != nil {fvs.cantSearchDataResponse(w);return}
+	if db_err != nil {err_msg.CantSearchDataResponse(w);return}
 
 	fs := afero.NewBasePathFs(afero.NewOsFs(),header.BaseDir())
 	path := filepath.Join(header.SubDir(),header.Name())
 	f,f_err :=fs.Open(path)
-	if f_err != nil {fvs.badCookieValueResponse(w);return}
+	if f_err != nil {err_msg.BadCookieValueResponse(w);return}
 
 	upgrader := websocket.Upgrader{}
 	ws_conn ,ws_err := upgrader.Upgrade(w,r,nil)
-	if ws_err != nil {fvs.cantStartWSLoopResponse(w);return}
-	fvs.loop(ws_conn,f)
+	if ws_err != nil {err_msg.CantStartWSLoopResponse(w);return}
+	fvs.loop(ws_conn,f,key)
 	
 }
-func(fvs *FileDataServ)loop(conn *websocket.Conn,f afero.File) {
+func(fvs *FileDataServ)loop(conn *websocket.Conn,f afero.File,key []byte) {
 	for {
 
 	}
