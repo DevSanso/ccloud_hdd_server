@@ -13,6 +13,7 @@ import (
 
 	"ccloud_hdd_server/auth"
 	"ccloud_hdd_server/get_db"
+	db_user "ccloud_hdd_server/db_sql/user"
 	"ccloud_hdd_server/db_sql"
 	"ccloud_hdd_server/file"
 	err_msg "ccloud_hdd_server/worker/internal"
@@ -47,7 +48,7 @@ func (v *ViewDir)makeFs(key int) (afero.Fs,error) {
 	conn,err := get_db.GetDbConn(context.Background())
 	if err != nil {return nil,err}
 	defer conn.Close()
-	base_key ,sql_err :=db_sql.GetBasePathId(conn,key)
+	base_key ,sql_err :=db_user.GetBasePathId(conn,key)
 	if sql_err != nil {return nil,sql_err}
 	var p string
 	p,sql_err = db_sql.GetBasePath(conn,base_key)
@@ -79,7 +80,7 @@ func (v *ViewDir) Do(w http.ResponseWriter,r *http.Request,_ []byte) {
 
 	
 
-	iList,err := file.GetDirList(fs,dir)
+	iList,err := file.GetFileList(fs,dir)
 	if err != nil {err_msg.CantSearchDataResponse(w);return}
 	
 	var buf = new(bytes.Buffer)
