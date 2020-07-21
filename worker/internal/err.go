@@ -33,3 +33,9 @@ func CantCreateDataResponse(w http.ResponseWriter) {
 	w.Write([]byte("can't create data"))
 	w.WriteHeader(500)
 }
+
+func CantConnectDbResponse(w http.ResponseWriter) {
+	w.Header().Set("content-type","text/plain")
+	w.Write([]byte("internal server error"))
+	w.WriteHeader(500)
+}
