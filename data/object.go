@@ -22,18 +22,19 @@ var (
 	OverflowSizeError = errors.New("OverflowSizeError")
 	NotMatchArraySizeError = errors.New("NotMatchArraySizeError")
 )
+
 type Object struct {
 	f afero.File
 	key []byte
 	iv []byte
 	cryt byte
-	tokenSize int64
+	tokenSize int
 	dataSize int64
 }
 
-func NewObject(f afero.File,key []byte,iv []byte,cryt byte,tokenSize,dataSize int64) (Object,error) {
+func NewObject(f afero.File,key []byte,iv []byte,cryt byte,tokenSize int,dataSize int64) (*Object,error) {
 	
-	return Object{f,key,iv,cryt,tokenSize,dataSize},nil
+	return &Object{f,key,iv,cryt,tokenSize,dataSize},nil
 }
 
 func (o *Object)GetKey() []byte {
@@ -95,10 +96,10 @@ func(o *Object)Close() error {
 }
 
 func (o *Object)checkOffset(offset int64,fSize int64) error {
-	if offset + o.tokenSize > fSize {
+	if offset + int64(o.tokenSize) > fSize {
 		return OverflowSizeError
 	}
-	if offset % o.tokenSize-1 != 0 {
+	if offset % int64(o.tokenSize-1) != 0 {
 		return OverflowSizeError
 	}
 	
@@ -127,5 +128,5 @@ func(o *Object)FileSize() (int64,error) {
 }
 
 func (o *Object)DataSize() int64 {return o.dataSize}
-func (o *Object)TokenSize() int64 {return o.tokenSize}
+func (o *Object)TokenSize() int {return o.tokenSize}
 
