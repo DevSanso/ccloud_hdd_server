@@ -6,22 +6,21 @@ import (
 
 	"ccloud_hdd_server/data"
 	"ccloud_hdd_server/db_sql"
-	"ccloud_hdd_server/use_hash"
-
-
 )
 
 
 func ReadFile(fs afero.Fs, name string,key []byte,iv[]byte, header *db_sql.Header) (*data.Object,error)  {
-	hash_name := string(use_hash.Sum([]byte(name)))
-	f,err:=fs.Open(hash_name)
+	enc_name,encode_err := EncodeFilePath(key,iv,name)
+	if encode_err != nil {return nil,encode_err}
+	f,err:=fs.Open(enc_name)
 	if err != nil {return nil,err}
-	return data.NewObject(f,key,iv,data.AES256,header.TokenSize(),header.Size())
+	return data.NewObject(f,key,iv,header.TokenSize(),header.Size())
 }
 func WriteFile(fs afero.Fs, name string,key []byte,iv[]byte,header *db_sql.Header) (*data.Object,error)  {
-	hash_name := string(use_hash.Sum([]byte(name)))
-	f,err := fs.OpenFile(hash_name,os.O_WRONLY | os.O_CREATE,os.FileMode(0))
+	enc_name,encode_err := EncodeFilePath(key,iv,name)
+	if encode_err != nil {return nil,encode_err}
+	f,err := fs.OpenFile(enc_name,os.O_WRONLY | os.O_CREATE,os.FileMode(0))
 	if err != nil {return nil,err}
-	return data.NewObject(f,key,iv,data.AES256,header.TokenSize(),header.Size())
+	return data.NewObject(f,key,iv,header.TokenSize(),header.Size())
 }
 
