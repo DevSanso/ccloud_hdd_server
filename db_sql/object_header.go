@@ -172,8 +172,6 @@ func (oh *Header) Name() string        { return oh.name }
 func (oh *Header) Size() int64         { return oh.size }
 func (oh *Header) Mode() os.FileMode   { return os.FileMode(0) }
 func (ob *Header) ModTime() time.Time  { return ob.date }
-func (*Header) IsDir() bool            { return false }
-func (*Header) Sys() interface{}       { return nil }
 func (ob *Header) BaseDir() string     { return filepath.FromSlash(ob.basePath) }
 func (ob *Header) SubDir() string      { return filepath.FromSlash(ob.subDirPath) }
 func (ob *Header) TokenSize() int      { return ob.tokenSize }
