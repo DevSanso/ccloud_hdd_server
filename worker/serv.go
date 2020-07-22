@@ -97,6 +97,7 @@ func (fvs *FileDataServ) Do(w http.ResponseWriter, r *http.Request, key []byte) 
 	}
 	fvs.loop(ws_conn, obj,header)
 }
+
 type wsFileRes struct {
 	Name string
 	Size int64
@@ -127,13 +128,20 @@ func (fvs *FileDataServ) loop(conn *websocket.Conn,
 	var cutData = func() []byte {
 		return data_buf[:offset + int64(obj.TokenSize()) - res_format.Size]
 	} 
-
+	
+	var is_next = true
 	for _,err := obj.ReadAt(data_buf,0);
 	 err != nil; _,err = obj.ReadAt(data_buf,offset){
 		if isOverDataRange(){
-				
-			data_buf = data_buf[:]	
+			data_buf = cutData()
+			is_next = false	
 		}
+
+		res_format.Offset = offset
+		res_format.IsExistNext = is_next
+		res_format.D = data_buf
+
+		if err = encode.Encode(&res_format);err != nil {panic(err)}
 
 	}
 }

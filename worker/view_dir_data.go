@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"database/sql"
 
 	"github.com/spf13/afero"
 
@@ -40,11 +41,8 @@ type _FileList struct {
 	FileInfos []_FileMeta
 }
 
-func (v *ViewDir) makeFs(key int) (afero.Fs, error) {
-	conn, err := get_db.GetDbConn(context.Background())
-	if err != nil {
-		return nil, err
-	}
+func (v *ViewDir) makeFs(conn *sql.Conn,key int) (afero.Fs, error) {
+	
 	defer conn.Close()
 	base_key, sql_err := db_user.GetBasePathId(conn, key)
 	if sql_err != nil {
@@ -59,7 +57,7 @@ func (v *ViewDir) makeFs(key int) (afero.Fs, error) {
 	return afero.NewBasePathFs(afero.NewOsFs(), p), nil
 }
 
-func (v *ViewDir) Do(w http.ResponseWriter, r *http.Request, _ []byte) {
+func (v *ViewDir) Do(w http.ResponseWriter, r *http.Request, key []byte) {
 	if r.Method != "GET" {
 		w.WriteHeader(400)
 		return
@@ -83,13 +81,24 @@ func (v *ViewDir) Do(w http.ResponseWriter, r *http.Request, _ []byte) {
 	}
 	dir := r.URL.Query().Get("Dir")
 
-	fs, fs_err := v.makeFs(using_key)
+	conn, db_err := get_db.GetDbConn(context.Background())
+	if db_err != nil {
+		pkg_internal.CantConnectDbResponse(w)
+		return
+	}
+
+	fs, fs_err := v.makeFs(conn,using_key)
 	if fs_err != nil {
 		pkg_internal.CantSearchDataResponse(w)
 		return
 	}
-
-	iList, err := file.GetFileList(fs, dir)
+	
+	iv,iv_err := db_user.GetUserIv(conn,using_key)
+	if iv_err != nil {
+		pkg_internal.CantSearchDataResponse(w)
+		return
+	}
+	iList, err := file.GetFileList(fs,key,iv, dir)
 	if err != nil {
 		pkg_internal.CantSearchDataResponse(w)
 		return
