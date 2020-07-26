@@ -111,10 +111,8 @@ func (fvs *FileDataServ) loop(conn *websocket.Conn,
 	defer obj.Close()
 
 	offset := int64(0)
-
-	var buf []byte
-	encode := json.NewEncoder(bytes.NewBuffer(buf))
-
+	var buf =bytes.Buffer{}
+	encode := json.NewEncoder(&buf)
 	
 	var data_buf = make([]byte,obj.TokenSize())
 	var res_format = wsFileRes{
@@ -131,7 +129,7 @@ func (fvs *FileDataServ) loop(conn *websocket.Conn,
 	
 	var is_next = true
 	for _,err := obj.ReadAt(data_buf,0);
-	 err != nil; _,err = obj.ReadAt(data_buf,offset){
+	 err == nil && is_next; _,err = obj.ReadAt(data_buf,offset){
 		if isOverDataRange(){
 			data_buf = cutData()
 			is_next = false	
@@ -141,9 +139,23 @@ func (fvs *FileDataServ) loop(conn *websocket.Conn,
 		res_format.IsExistNext = is_next
 		res_format.D = data_buf
 
-		if err = encode.Encode(&res_format);err != nil {panic(err)}
-
+		
+		if err = encode.Encode(&res_format);err != nil {
+			fvs.serveWsErr(conn,err);break
+		}
+		
+		if err = conn.WriteMessage(websocket.TextMessage,buf.Bytes());err != nil {
+			fvs.serveWsErr(conn,err);break
+		}
+		buf.Reset()
 	}
+
+	if !is_next {conn.WriteMessage(websocket.CloseMessage,[]byte("done"))}
+
+}
+
+func (fvs *FileDataServ)serveWsErr(conn *websocket.Conn,err error) {
+	conn.WriteMessage(websocket.CloseMessage,[]byte(err.Error()))
 }
 
 
