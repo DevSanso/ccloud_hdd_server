@@ -78,9 +78,16 @@ func(o *Object)WriteAt(b []byte,offset int64)(int,error) {
 	var write_len int
 	write_len,err = w_at.WriteAt(buf,offset);
 	if err != nil {return 0,err}
+
+	if same,f_size := o.isSameDataSize();!same {o.updateDataSize(f_size)}
 	return write_len,nil
 }
-
+func (o *Object)isSameDataSize() (bool,int64) {
+	info,err := o.f.Stat()
+	if err != nil {panic(err)}
+	return info.Size() == o.dataSize,info.Size()
+}
+func (o *Object)updateDataSize(size int64) {o.dataSize = size}
 
 
 func(o *Object)Seek(offset int64, whence int) (int64,error) {
