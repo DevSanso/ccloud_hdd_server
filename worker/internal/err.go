@@ -39,3 +39,19 @@ func CantConnectDbResponse(w http.ResponseWriter) {
 	w.Write([]byte("internal server error"))
 	w.WriteHeader(500)
 }
+func BadMethodResponse(w http.ResponseWriter) {
+	w.Header().Set("content-type","text/plain")
+	w.Write([]byte("BadMethodRequset"))
+	w.WriteHeader(400)
+}
+
+func AlreadyExistDataResponse(w http.ResponseWriter) {
+	w.Header().Set("content-type","text/plain")
+	w.Write([]byte("already exist data"))
+	w.WriteHeader(400)
+}
+func RawErrorResponse(w http.ResponseWriter,err error,code int) {
+	w.Header().Set("content-type","text/plain")
+	w.Write([]byte(err.Error()))
+	w.WriteHeader(code)
+}
