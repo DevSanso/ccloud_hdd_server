@@ -18,7 +18,7 @@ const (
 	_SelectUserBaseIdSql = "SELECT base_id FROM user WHERE id = ?;"
 	_CreateUserTableSql = "CREATE TABLE user(" +
 							"id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY," + 
-							"p_hash CHAR(32) NOT NULL," +
+							"p_hash CHAR(32) NOT NULL UNIQUE," +
 							"iv VARCHAR(16) NOT NULL," +
 							"base_id INTEGER);"
 	_SelectUserIvSql = "SELECT iv FROM user WHERE id = ?;"
@@ -67,6 +67,19 @@ func GetBasePathId(conn *sql.Conn,userId int) (int,error) {
 	var res int = 0
 	err := row.Scan(&res)
 	return res,err
+}
+
+func IsExistUserPasswd(conn *sql.Conn,passwdString string) (bool,error) {
+	h :=hash.Sum([]byte(passwdString))
+	const s = "SELECT EXISTS(SELECT * FROM user WHERE p_hash = ?);"
+	r:=conn.QueryRowContext(context.Background(),s,h)
+	var res int
+	err := r.Scan(&res)
+	if res == 1 {
+		return true,err
+	}else {
+		return false,err
+	}
 }
 
 
