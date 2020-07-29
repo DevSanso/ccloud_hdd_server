@@ -1,25 +1,25 @@
 package worker
 
 import (
+	"bytes"
+	"ccloud_hdd_server/pkg/auth"
+	"ccloud_hdd_server/pkg/data"
+	"ccloud_hdd_server/pkg/db_sql"
+	"ccloud_hdd_server/pkg/file"
+	"ccloud_hdd_server/pkg/get_db"
 	"context"
 	"database/sql"
-	"net/http"
 	"encoding/json"
+	"net/http"
 	"path/filepath"
 	"strconv"
-	"bytes"
 
 	"github.com/gorilla/websocket"
 	"github.com/spf13/afero"
 
-	"ccloud_hdd_server/auth"
-	"ccloud_hdd_server/data"
-	"ccloud_hdd_server/db_sql"
-	db_user "ccloud_hdd_server/db_sql/user"
-	"ccloud_hdd_server/file"
-	"ccloud_hdd_server/get_db"
+	db_user "ccloud_hdd_server/pkg/db_sql/user"
 
-	pkg_internal "ccloud_hdd_server/worker/internal"
+	pkg_internal "ccloud_hdd_server/pkg/worker/internal"
 )
 
 func mergePath(dir, file string) string {
@@ -81,7 +81,7 @@ func (fvs *FileDataServ) Do(w http.ResponseWriter, r *http.Request, key []byte) 
 	}
 
 	fs := afero.NewBasePathFs(afero.NewOsFs(), header.BaseDir())
-	
+
 	obj, f_err := file.ReadFile(fs,
 		filepath.Join(header.SubDir(), header.Name()), key, iv, header)
 	if f_err != nil {
@@ -95,69 +95,68 @@ func (fvs *FileDataServ) Do(w http.ResponseWriter, r *http.Request, key []byte) 
 		pkg_internal.CantStartWSLoopResponse(w)
 		return
 	}
-	fvs.loop(ws_conn, obj,header)
+	fvs.loop(ws_conn, obj, header)
 }
 
 type wsFileRes struct {
-	Name string
-	Size int64
-	Offset int64
+	Name        string
+	Size        int64
+	Offset      int64
 	IsExistNext bool
-	D []byte
+	D           []byte
 }
-func (fvs *FileDataServ) loop(conn *websocket.Conn, 
-	obj *data.Object,h *db_sql.Header) {
+
+func (fvs *FileDataServ) loop(conn *websocket.Conn,
+	obj *data.Object, h *db_sql.Header) {
 	defer conn.Close()
 	defer obj.Close()
 
 	offset := int64(0)
-	var buf =bytes.Buffer{}
+	var buf = bytes.Buffer{}
 	encode := json.NewEncoder(&buf)
-	
-	var data_buf = make([]byte,obj.TokenSize())
+
+	var data_buf = make([]byte, obj.TokenSize())
 	var res_format = wsFileRes{
-		Name : h.Name(),
-		Size : obj.DataSize(),
+		Name: h.Name(),
+		Size: obj.DataSize(),
 	}
 
 	var isOverDataRange = func() bool {
-		return offset + int64(obj.TokenSize()) > res_format.Size
+		return offset+int64(obj.TokenSize()) > res_format.Size
 	}
 	var cutData = func() []byte {
-		return data_buf[:offset + int64(obj.TokenSize()) - res_format.Size]
-	} 
-	
+		return data_buf[:offset+int64(obj.TokenSize())-res_format.Size]
+	}
+
 	var is_next = true
-	for _,err := obj.ReadAt(data_buf,0);
-	 err == nil && is_next; _,err = obj.ReadAt(data_buf,offset){
-		if isOverDataRange(){
+	for _, err := obj.ReadAt(data_buf, 0); err == nil && is_next; _, err = obj.ReadAt(data_buf, offset) {
+		if isOverDataRange() {
 			data_buf = cutData()
-			is_next = false	
+			is_next = false
 		}
 
 		res_format.Offset = offset
 		res_format.IsExistNext = is_next
 		res_format.D = data_buf
 
-		
-		if err = encode.Encode(&res_format);err != nil {
-			fvs.serveWsErr(conn,err);break
+		if err = encode.Encode(&res_format); err != nil {
+			fvs.serveWsErr(conn, err)
+			break
 		}
-		
-		if err = conn.WriteMessage(websocket.TextMessage,buf.Bytes());err != nil {
-			fvs.serveWsErr(conn,err);break
+
+		if err = conn.WriteMessage(websocket.TextMessage, buf.Bytes()); err != nil {
+			fvs.serveWsErr(conn, err)
+			break
 		}
 		buf.Reset()
 	}
 
-	if !is_next {conn.WriteMessage(websocket.CloseMessage,[]byte("done"))}
+	if !is_next {
+		conn.WriteMessage(websocket.CloseMessage, []byte("done"))
+	}
 
 }
 
-func (fvs *FileDataServ)serveWsErr(conn *websocket.Conn,err error) {
-	conn.WriteMessage(websocket.CloseMessage,[]byte(err.Error()))
+func (fvs *FileDataServ) serveWsErr(conn *websocket.Conn, err error) {
+	conn.WriteMessage(websocket.CloseMessage, []byte(err.Error()))
 }
-
-
-
-

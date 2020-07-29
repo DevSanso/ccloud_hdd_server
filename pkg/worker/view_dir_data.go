@@ -2,21 +2,21 @@ package worker
 
 import (
 	"bytes"
+	"ccloud_hdd_server/pkg/auth"
+	"ccloud_hdd_server/pkg/db_sql"
+	"ccloud_hdd_server/pkg/file"
+	"ccloud_hdd_server/pkg/get_db"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"os"
 	"strconv"
-	"database/sql"
 
 	"github.com/spf13/afero"
 
-	"ccloud_hdd_server/auth"
-	"ccloud_hdd_server/db_sql"
-	db_user "ccloud_hdd_server/db_sql/user"
-	"ccloud_hdd_server/file"
-	"ccloud_hdd_server/get_db"
-	pkg_internal "ccloud_hdd_server/worker/internal"
+	db_user "ccloud_hdd_server/pkg/db_sql/user"
+	pkg_internal "ccloud_hdd_server/pkg/worker/internal"
 )
 
 type ViewDir struct{}
@@ -41,8 +41,8 @@ type _FileList struct {
 	FileInfos []_FileMeta
 }
 
-func (v *ViewDir) makeFs(conn *sql.Conn,key int) (afero.Fs, error) {
-	
+func (v *ViewDir) makeFs(conn *sql.Conn, key int) (afero.Fs, error) {
+
 	defer conn.Close()
 	base_key, sql_err := db_user.GetBasePathId(conn, key)
 	if sql_err != nil {
@@ -87,18 +87,18 @@ func (v *ViewDir) Do(w http.ResponseWriter, r *http.Request, key []byte) {
 		return
 	}
 
-	fs, fs_err := v.makeFs(conn,using_key)
+	fs, fs_err := v.makeFs(conn, using_key)
 	if fs_err != nil {
 		pkg_internal.CantSearchDataResponse(w)
 		return
 	}
-	
-	iv,iv_err := db_user.GetUserIv(conn,using_key)
+
+	iv, iv_err := db_user.GetUserIv(conn, using_key)
 	if iv_err != nil {
 		pkg_internal.CantSearchDataResponse(w)
 		return
 	}
-	iList, err := file.GetFileList(fs,key,iv, dir)
+	iList, err := file.GetFileList(fs, key, iv, dir)
 	if err != nil {
 		pkg_internal.CantSearchDataResponse(w)
 		return
