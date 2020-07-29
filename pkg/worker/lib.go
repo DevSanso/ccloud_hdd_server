@@ -16,6 +16,7 @@ type Worker interface {
 	Do(w http.ResponseWriter, r *http.Request, key []byte)
 }
 
+
 func authAndGetInfo(r *http.Request) (userkey int, dbConn *sql.Conn, iv []byte, basePath string, err error) {
 	ck, ck_err := r.Cookie("session")
 	if ck_err != nil {
