@@ -2,19 +2,22 @@ package ws
 
 import (
 	"sync"
+
 	"github.com/gorilla/websocket"
 
 	"ccloud_hdd_server/pkg/data"
 )
 
-type WsLoopCtx struct {
-	Conn   *websocket.Conn
-	Obj    *data.Object
+type WsServiceCtx struct {
+	Conn *websocket.Conn
+	Obj  *data.Object
 
+	Wg   *sync.WaitGroup
 	Args interface{}
-	
 }
 
-type Thread interface{
-	Push(loop *WsLoopCtx,wg sync.WaitGroup)
+func (wlc *WsServiceCtx) setWg(wg *sync.WaitGroup) { wlc.wg = wg }
+
+type Thread interface {
+	Push(loop *WsServiceCtx)
 }
