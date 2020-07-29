@@ -1,22 +1,23 @@
 package worker
 
 import (
-	"ccloud_hdd_server/pkg/auth"
-	"ccloud_hdd_server/pkg/data"
-	"ccloud_hdd_server/pkg/db_sql"
-	"ccloud_hdd_server/pkg/file"
-	"ccloud_hdd_server/pkg/get_db"
+
 	"context"
 	"database/sql"
 	"net/http"
 	"os"
 	"strconv"
+	"errors"
 
 	"github.com/gorilla/websocket"
 	"github.com/spf13/afero"
 
+	"ccloud_hdd_server/pkg/auth"
+	"ccloud_hdd_server/pkg/data"
+	"ccloud_hdd_server/pkg/db_sql"
 	db_user "ccloud_hdd_server/pkg/db_sql/user"
-
+	"ccloud_hdd_server/pkg/file"
+	"ccloud_hdd_server/pkg/get_db"
 	pkg_internal "ccloud_hdd_server/pkg/worker/internal"
 )
 
@@ -57,10 +58,33 @@ func (cfw *CreateFileWork) Do(w http.ResponseWriter, r *http.Request, key []byte
 
 }
 
-func (cfw *CreateFileWork) uploadFileToWs(ws *websocket.Conn, c *sql.Conn, o *data.Object) error {
-	return nil
+type fileDataReq struct{
+	Name string
+	SubDir string
+	D []byte
+	IsExistNext bool
 }
 
+func (cfw *CreateFileWork) uploadFileToWs(ws *websocket.Conn, c *sql.Conn, o *data.Object) error {
+	var data fileDataReq;var err error
+	
+	for {
+		err = ws.ReadJSON(&data)
+		if err != nil {break}
+
+		if !cfw.isDataRange(data.D,o.TokenSize()) {
+			err = errors.New("Data Token Size over")
+			break
+		}
+
+		
+		
+	}
+	
+	
+	return err
+}
+func (cfw *CreateFileWork)isDataRange(b []byte,tLen int) bool {return len(b) == tLen}
 type CreateDirWork struct{}
 
 func (cdw *CreateDirWork) Do(w http.ResponseWriter, r *http.Request, key []byte) {
