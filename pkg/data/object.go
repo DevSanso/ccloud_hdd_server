@@ -61,13 +61,17 @@ func (o *Object) ReadAt(b []byte, offset int64) (int, error) {
 	return read_len, nil
 }
 
-func (o *Object) WriteAt(b []byte, offset int64) (int, error) {
+func (o *Object) WriteAt(src []byte, offset int64) (int, error) {
 	f_size, err := o.FileSize()
 
 	if err != nil {
 		return 0, err
 	}
-
+	var b = make([]byte,o.tokenSize)
+	copy(b,src)
+	if data_l := len(src);data_l > o.tokenSize {
+		return 0,OverflowSizeError
+	}
 	if err = o.checkOffset(offset, f_size); err != nil {
 		return 0, err
 	}
