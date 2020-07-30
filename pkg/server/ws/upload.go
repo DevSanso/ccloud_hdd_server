@@ -2,6 +2,10 @@ package ws
 
 import (
 	"sync"
+	"database/sql"
+
+
+	"ccloud_hdd_server/pkg/db_sql"
 )
 
 func uploadMainRoutine(wp *sync.Pool, cp *sync.Pool) {
@@ -10,11 +14,11 @@ func uploadMainRoutine(wp *sync.Pool, cp *sync.Pool) {
 		return
 	}
 
-	slm_ptr, p_ok := t.Args.(*ServiceCtxValue)
+	ptr, p_ok := t.Args.Value(CtxIndex).(*WsFileApiFormat)
 	if !p_ok {
 		panic("wsThread structure assertion error")
 	}
-	err := t.Conn.ReadJSON(slm_ptr.format)
+	err := t.Conn.ReadJSON(ptr)
 	if err != nil {
 		errAndClose(t, err)
 		cp.Put(t)
@@ -22,19 +26,29 @@ func uploadMainRoutine(wp *sync.Pool, cp *sync.Pool) {
 	}
 	obj := t.Obj
 	var write_len int
-	write_len, err = obj.WriteAt(slm_ptr.format.D, slm_ptr.Offset)
+	write_len, err = obj.WriteAt(ptr.D, ptr.Offset)
 	if err != nil {
 		errAndClose(t, err)
 		cp.Put(t)
 		return
 	}
-	if !slm_ptr.format.IsExistNext {
+	if !ptr.IsExistNext {
+		db_conn := t.Args.Value("db-conn").(*sql.Conn)
+		name := t.Args.Value("origin-name").(string)
+		cfg := t.Args.Value("cfg").(*db_sql.ObjectConfig)
+		cfg.Size = ptr.Offset + int64(write_len)
+		
+		go func() {
+			_,err := db_sql.CreateHeader(db_conn,name,cfg)
+			if err != nil {panic(err)}
+		}()
+
 		cp.Put(t)
 		return
 	}
 	go func() {
-		slm_ptr.Offset += int64(write_len)
-		slm_ptr.format.IsExistNext = true
+		ptr.Offset += int64(write_len)
+		ptr.IsExistNext = true
 		wp.Put(t)
 	}()
 

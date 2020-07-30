@@ -1,6 +1,8 @@
 package ws
 
 import (
+	"context"
+	"errors"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -8,22 +10,31 @@ import (
 	"ccloud_hdd_server/pkg/data"
 )
 
+var (
+	CantConvertCtxValueErr = errors.New("CantConvertCtxValueErr")
+)
+
+const (
+	CtxIndex = "ws-api-buffer"
+)
+
 type WsServiceCtx struct {
 	Conn *websocket.Conn
 	Obj  *data.Object
 
 	Wg   *sync.WaitGroup
-	Args interface{}
+	Args context.Context
 }
 
 func (wlc *WsServiceCtx) setWg(wg *sync.WaitGroup) { wlc.Wg = wg }
 
-type Thread interface{ Push(loop *WsServiceCtx) }
+type Thread interface {
+	Push(loop *WsServiceCtx)
+}
 type MainFunc func(wait *sync.Pool, close *sync.Pool)
 type CloseFunc func(close *sync.Pool)
 
-
-type wsFileFormat struct {
+type WsFileApiFormat struct {
 	Name string
 	//데이터 사이즈
 	Size        int64
@@ -31,6 +42,7 @@ type wsFileFormat struct {
 	IsExistNext bool
 	D           []byte
 }
+
 type wsThread struct {
 	waitLoopP sync.Pool
 	closePool sync.Pool
@@ -38,20 +50,20 @@ type wsThread struct {
 	mainRoutine  MainFunc
 	closeRoutine CloseFunc
 }
-type ServiceCtxValue struct {
+type ServiceCtx struct {
 	Name   string
 	Offset int64
 
-	format *wsFileFormat
+	format *WsFileApiFormat
 }
 
-func NewServThread() *wsThread {
+func NewServThread() Thread {
 	return newWsThread(
 		serveMainRoutine,
 		serveCloseRoutine,
 	)
 }
-func NewUploadThread() *wsThread {
+func NewUploadThread() Thread {
 	return newWsThread(
 		uploadMainRoutine,
 		uploadCloseRoutine,
@@ -73,7 +85,13 @@ func newWsThread(mainF MainFunc, closeF CloseFunc) *wsThread {
 	}()
 	return s
 }
-func (sl *wsThread) Push(wsCtx *WsServiceCtx) { sl.waitLoopP.Put(wsCtx) }
+func (sl *wsThread) Push(wsCtx *WsServiceCtx) {
+	sl.waitLoopP.Put(wsCtx)
+}
+func (sl *wsThread) makeCtx(wsCtx *WsServiceCtx) error {
+	sl.waitLoopP.Put(wsCtx)
+	return nil
+}
 
 func errAndClose(t *WsServiceCtx, err error) {
 	t.Conn.WriteMessage(websocket.CloseMessage,
@@ -86,3 +104,4 @@ func isOverDataRange(off, dataSize int64, tokenSize int) bool {
 func cutData(d []byte, off int64, dataSize int64) []byte {
 	return d[:dataSize-off]
 }
+

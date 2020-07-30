@@ -10,17 +10,15 @@ func serveMainRoutine(wp *sync.Pool, cp *sync.Pool) {
 		return
 	}
 
-	slm_ptr, p_ok := t.Args.(*ServiceCtxValue)
+	ptr, p_ok := t.Args.Value(CtxIndex).(*WsFileApiFormat)
 	if !p_ok {
 		panic("wsThread structure assertion error")
 	}
 
 	obj := t.Obj
 
-	var res_format = slm_ptr.format
-
 	var b = make([]byte, obj.TokenSize())
-	_, err := obj.ReadAt(b, slm_ptr.Offset)
+	_, err := obj.ReadAt(b, ptr.Offset)
 
 	if err != nil {
 		errAndClose(t, err)
@@ -29,17 +27,16 @@ func serveMainRoutine(wp *sync.Pool, cp *sync.Pool) {
 	}
 
 	if isOverDataRange(
-		slm_ptr.Offset, obj.DataSize(), obj.TokenSize()) {
+		ptr.Offset, obj.DataSize(), obj.TokenSize()) {
 
-		b = cutData(b, slm_ptr.Offset, obj.DataSize())
-		res_format.Size = obj.DataSize() - slm_ptr.Offset
-		res_format.IsExistNext = false
+		b = cutData(b, ptr.Offset, obj.DataSize())
+		ptr.Size = obj.DataSize() - ptr.Offset
+		ptr.IsExistNext = false
 	}
 
-	res_format.D = b
-	res_format.Offset = slm_ptr.Offset
+	ptr.D = b
 
-	err = t.Conn.WriteJSON(&res_format)
+	err = t.Conn.WriteJSON(ptr)
 
 	if err != nil {
 		errAndClose(t, err)
@@ -47,14 +44,14 @@ func serveMainRoutine(wp *sync.Pool, cp *sync.Pool) {
 		return
 	}
 
-	if !res_format.IsExistNext {
+	if !ptr.IsExistNext {
 		cp.Put(t)
 		return
 	}
 
 	go func() {
-		slm_ptr.Offset += int64(len(res_format.D))
-		slm_ptr.format.IsExistNext = true
+		ptr.Offset += int64(len(ptr.D))
+		ptr.IsExistNext = true
 		wp.Put(t)
 	}()
 
