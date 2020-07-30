@@ -26,7 +26,7 @@ const (
 )
 
 type WsServerHook interface {
-	RequestWsService(r *WsRequest) []byte
+	RequestWsService(r *WsRequest) ([64]byte)
 }
 
 
@@ -46,7 +46,7 @@ type WsRequest struct {
 	WsMethod int
 
 	Obj  *data.Object
-	Args interface{}
+	Args context.Context
 }
 
 type wsServeMux struct {
@@ -85,6 +85,9 @@ func (wss *wsServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var upgrade = websocket.Upgrader{}
 	conn, ws_err := upgrade.Upgrade(w, r, nil)
+	
+
+
 	if ws_err != nil {
 		writeErrToRes(w, ws_err)
 		w.WriteHeader(400)
@@ -96,7 +99,7 @@ func (wss *wsServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Conn: conn,
 		Obj:  ctx.Value("object").(*data.Object),
 		Wg:   lwg,
-		Args: ctx.Value("args"),
+		Args: ctx.Value("args").(context.Context),
 	})
 
 }
@@ -128,6 +131,8 @@ func (wss *wsServeMux) RequestWsService(r *WsRequest) (key [64]byte) {
 	wss.urlCtx[key] = ctx
 	return
 }
+
+
 
 func (wss *wsServeMux) makeKey() [64]byte {
 	key := util.MakeBytes(64)
