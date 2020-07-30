@@ -1,15 +1,14 @@
 package worker
 
 import (
-
 	"context"
 	"database/sql"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
-	"errors"
+	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/spf13/afero"
 
 	"ccloud_hdd_server/pkg/auth"
@@ -18,6 +17,8 @@ import (
 	db_user "ccloud_hdd_server/pkg/db_sql/user"
 	"ccloud_hdd_server/pkg/file"
 	"ccloud_hdd_server/pkg/get_db"
+	servers "ccloud_hdd_server/pkg/server"
+	ws_service "ccloud_hdd_server/pkg/server/ws"
 	pkg_internal "ccloud_hdd_server/pkg/worker/internal"
 )
 
@@ -26,19 +27,16 @@ const DataToKenSize = 4096
 type CreateFileWork struct{}
 
 func (cfw *CreateFileWork) Do(w http.ResponseWriter, r *http.Request, key []byte) {
-	var upgrade = websocket.Upgrader{}
-	ws_conn, ws_err := upgrade.Upgrade(w, r, nil)
-	if ws_err != nil {
-		pkg_internal.CantStartWSLoopResponse(w)
-		return
-	}
-	defer ws_conn.Close()
+	
 
-	_, db_conn, iv, base_path, setting_err := authAndGetInfo(r)
+	uk, db_conn, iv, base_path, setting_err := authAndGetInfo(r)
 	if setting_err != nil {
 		pkg_internal.RawErrorResponse(w, setting_err, 400)
 	}
-
+	base_id,db_err := db_user.GetBasePathId(db_conn,uk)
+	if db_err != nil {
+		pkg_internal.RawErrorResponse(w,db_err, 500)
+	}
 	dir := r.Form.Get("subDir")
 	name := r.Form.Get("name")
 
@@ -50,11 +48,34 @@ func (cfw *CreateFileWork) Do(w http.ResponseWriter, r *http.Request, key []byte
 		return
 	}
 
-	ws_loop_err := cfw.uploadFileToWs(ws_conn, db_conn, obj)
-	if ws_loop_err != nil {
-		pkg_internal.CantStartWSLoopResponse(w)
-		return
-	}
+
+	hook := servers.WsServerHooking()
+	var req = new(servers.WsRequest)
+	h, _, _ := net.SplitHostPort(r.RemoteAddr)
+	r_ip := net.ParseIP(h)
+	req.Ip = r_ip
+	req.Obj = obj
+	req.WsMethod = servers.WsUPLOAD
+	req.Args = func() context.Context {
+		origin := context.Background()
+		format := context.WithValue(origin,
+			ws_service.CtxIndex,&ws_service.WsFileApiFormat{})
+		db_c := context.WithValue(format,"db-conn",db_conn)
+		n := context.WithValue(db_c,"origin-name",name)
+		
+		return context.WithValue(n,"cfg",db_sql.ObjectConfig{
+			base_id,
+			dir,
+			DataToKenSize,
+			0,
+			time.Now(),
+		})
+	}()
+	url_key := hook.RequestWsService(req)
+
+	w.Header().Set("content-type","text/plain")
+	w.Write(url_key[:])
+	w.WriteHeader(204)
 
 }
 
@@ -65,26 +86,7 @@ type fileDataReq struct{
 	IsExistNext bool
 }
 
-func (cfw *CreateFileWork) uploadFileToWs(ws *websocket.Conn, c *sql.Conn, o *data.Object) error {
-	var data fileDataReq;var err error
-	
-	for {
-		err = ws.ReadJSON(&data)
-		if err != nil {break}
 
-		if !cfw.isDataRange(data.D,o.TokenSize()) {
-			err = errors.New("Data Token Size over")
-			break
-		}
-
-		
-		
-	}
-	
-	
-	return err
-}
-func (cfw *CreateFileWork)isDataRange(b []byte,tLen int) bool {return len(b) == tLen}
 type CreateDirWork struct{}
 
 func (cdw *CreateDirWork) Do(w http.ResponseWriter, r *http.Request, key []byte) {

@@ -20,6 +20,7 @@ import (
 	"ccloud_hdd_server/pkg/file"
 	"ccloud_hdd_server/pkg/get_db"
 	servers "ccloud_hdd_server/pkg/server"
+	ws_service "ccloud_hdd_server/pkg/server/ws"
 	db_user "ccloud_hdd_server/pkg/db_sql/user"
 	pkg_internal "ccloud_hdd_server/pkg/worker/internal"
 )
@@ -92,15 +93,12 @@ func (fvs *FileDataServ) Do(w http.ResponseWriter, r *http.Request, key []byte) 
 	}
 	h, _, _ := net.SplitHostPort(r.RemoteAddr)
 	r_ip := net.ParseIP(h)
-	fvs.wsHook(r_ip,obj,header)
+	url_key := fvs.wsHook(r_ip,obj,header)
 	
-	upgrader := websocket.Upgrader{}
-	ws_conn, ws_err := upgrader.Upgrade(w, r, nil)
-	if ws_err != nil {
-		pkg_internal.CantStartWSLoopResponse(w)
-		return
-	}
-	fvs.loop(ws_conn, obj, header)
+	w.Header().Set("content-type","text/plain")
+	w.Write(url_key[:])
+	w.WriteHeader(204)
+
 }
 
 type wsFileFormat struct {
@@ -111,65 +109,26 @@ type wsFileFormat struct {
 	D           []byte
 }
 
-func (fvs *FileDataServ)wsHook(ip net.IP,obj *data.Object, h *db_sql.Header) {
-	var req servers.WsRequest
+func (fvs *FileDataServ)wsHook(ip net.IP,obj *data.Object, h *db_sql.Header) [64]byte{
+	var req = new(servers.WsRequest)
 	req.Ip = ip
 	req.Obj = obj
 	req.WsMethod = servers.WsSER
-	
+
+	req.Args = context.WithValue(context.Background(),
+	 ws_service.CtxIndex,&ws_service.WsFileApiFormat{
+		h.Name(),
+		h.Size(),
+		0,
+		true,
+		[]byte(""),
+	})
+
 	hook := servers.WsServerHooking()
+	return hook.RequestWsService(req)
+	
 }
 
-func (fvs *FileDataServ) loop(conn *websocket.Conn,
-	obj *data.Object, h *db_sql.Header) {
-	defer conn.Close()
-	defer obj.Close()
-
-	offset := int64(0)
-	var buf = bytes.Buffer{}
-	encode := json.NewEncoder(&buf)
-
-	var data_buf = make([]byte, obj.TokenSize())
-	var res_format = wsFileFormat{
-		Name: h.Name(),
-		Size: obj.DataSize(),
-	}
-
-	var isOverDataRange = func() bool {
-		return offset+int64(obj.TokenSize()) > res_format.Size
-	}
-	var cutData = func() []byte {
-		return data_buf[:offset+int64(obj.TokenSize())-res_format.Size]
-	}
-
-	var is_next = true
-	for _, err := obj.ReadAt(data_buf, 0); err == nil && is_next; _, err = obj.ReadAt(data_buf, offset) {
-		if isOverDataRange() {
-			data_buf = cutData()
-			is_next = false
-		}
-
-		res_format.Offset = offset
-		res_format.IsExistNext = is_next
-		res_format.D = data_buf
-
-		if err = encode.Encode(&res_format); err != nil {
-			fvs.serveWsErr(conn, err)
-			break
-		}
-
-		if err = conn.WriteMessage(websocket.TextMessage, buf.Bytes()); err != nil {
-			fvs.serveWsErr(conn, err)
-			break
-		}
-		buf.Reset()
-	}
-
-	if !is_next {
-		conn.WriteMessage(websocket.CloseMessage, []byte("done"))
-	}
-
-}
 
 func (fvs *FileDataServ) serveWsErr(conn *websocket.Conn, err error) {
 	conn.WriteMessage(websocket.CloseMessage, []byte(err.Error()))
