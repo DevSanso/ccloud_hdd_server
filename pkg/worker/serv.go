@@ -2,14 +2,11 @@ package worker
 
 import (
 	"bytes"
-	"ccloud_hdd_server/pkg/auth"
-	"ccloud_hdd_server/pkg/data"
-	"ccloud_hdd_server/pkg/db_sql"
-	"ccloud_hdd_server/pkg/file"
-	"ccloud_hdd_server/pkg/get_db"
+	
 	"context"
 	"database/sql"
 	"encoding/json"
+	"net"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -17,8 +14,13 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/spf13/afero"
 
+	"ccloud_hdd_server/pkg/auth"
+	"ccloud_hdd_server/pkg/data"
+	"ccloud_hdd_server/pkg/db_sql"
+	"ccloud_hdd_server/pkg/file"
+	"ccloud_hdd_server/pkg/get_db"
+	servers "ccloud_hdd_server/pkg/server"
 	db_user "ccloud_hdd_server/pkg/db_sql/user"
-
 	pkg_internal "ccloud_hdd_server/pkg/worker/internal"
 )
 
@@ -88,7 +90,10 @@ func (fvs *FileDataServ) Do(w http.ResponseWriter, r *http.Request, key []byte) 
 		pkg_internal.BadCookieValueResponse(w)
 		return
 	}
-
+	h, _, _ := net.SplitHostPort(r.RemoteAddr)
+	r_ip := net.ParseIP(h)
+	fvs.wsHook(r_ip,obj,header)
+	
 	upgrader := websocket.Upgrader{}
 	ws_conn, ws_err := upgrader.Upgrade(w, r, nil)
 	if ws_err != nil {
@@ -98,12 +103,21 @@ func (fvs *FileDataServ) Do(w http.ResponseWriter, r *http.Request, key []byte) 
 	fvs.loop(ws_conn, obj, header)
 }
 
-type wsFileRes struct {
+type wsFileFormat struct {
 	Name        string
 	Size        int64
 	Offset      int64
 	IsExistNext bool
 	D           []byte
+}
+
+func (fvs *FileDataServ)wsHook(ip net.IP,obj *data.Object, h *db_sql.Header) {
+	var req servers.WsRequest
+	req.Ip = ip
+	req.Obj = obj
+	req.WsMethod = servers.WsSER
+	
+	hook := servers.WsServerHooking()
 }
 
 func (fvs *FileDataServ) loop(conn *websocket.Conn,
@@ -116,7 +130,7 @@ func (fvs *FileDataServ) loop(conn *websocket.Conn,
 	encode := json.NewEncoder(&buf)
 
 	var data_buf = make([]byte, obj.TokenSize())
-	var res_format = wsFileRes{
+	var res_format = wsFileFormat{
 		Name: h.Name(),
 		Size: obj.DataSize(),
 	}
