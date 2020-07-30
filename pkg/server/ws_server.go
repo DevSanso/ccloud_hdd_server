@@ -15,15 +15,31 @@ import (
 )
 
 const (
-	WsGET = iota
+	WsUPLOAD = iota
 	WsSER
 
 	__WsEndPos__
 )
 
+const (
+	UrlKeySize = 64
+)
+
 type WsServerHook interface {
 	RequestWsService(r *WsRequest) []byte
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 type WsRequest struct {
 	Ip       net.IP
@@ -41,12 +57,13 @@ type wsServeMux struct {
 
 func newWsServeMux() *wsServeMux {
 	var wss = &wsServeMux{}
-	wss.services[WsSER] = ws_service.NewServeLoop()
+	wss.services[WsSER] = ws_service.NewServThread()
+	wss.services[WsUPLOAD] = ws_service.NewUploadThread()
 	return wss
 }
 
 func (wss *wsServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx, code, err := wss.readHttpVal(r)
+	ctx, code, err := wss.checkHttpVal(r)
 	if err != nil {
 		writeErrToRes(w, err)
 		w.WriteHeader(code)
@@ -84,7 +101,7 @@ func (wss *wsServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (wss *wsServeMux) readHttpVal(r *http.Request) (context.Context, int, error) {
+func (wss *wsServeMux) checkHttpVal(r *http.Request) (context.Context, int, error) {
 	url := []byte(r.URL.Query().Get("url"))
 	var k64 [64]byte
 	l := copy(k64[:], url)
@@ -105,12 +122,15 @@ func (wss *wsServeMux) awaitServiceCtx(method int, wlc *ws_service.WsServiceCtx)
 	wlc.Wg.Wait()
 }
 
-func (wss *wsServeMux) RequestWsService(r *WsRequest) (key []byte, err error) {
+func (wss *wsServeMux) RequestWsService(r *WsRequest) (key [64]byte) {
 	key = wss.makeKey()
+	ctx := wpm.MakeReqContext(r)
+	wss.urlCtx[key] = ctx
+	return
 }
 
-func (wss *wsServeMux) makeKey() (key []byte) {
-	key = util.MakeBytes(64)
+func (wss *wsServeMux) makeKey() [64]byte {
+	key := util.MakeBytes(64)
 	var key64 [64]byte
 	copy(key64[:], key)
 
@@ -120,7 +140,14 @@ func (wss *wsServeMux) makeKey() (key []byte) {
 	}
 	wss.urlSet.Add(key64)
 
-	return key
+	return key64
+}
+
+func (wss *wsServeMux) freeKey(k [64]byte) {
+	if !wss.urlSet.Has(k) {
+		return
+	}
+	wss.urlSet.Remove(k)
 }
 
 type wsPrivateMethod struct{}

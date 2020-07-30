@@ -19,3 +19,9 @@ func writeErrToRes(w http.ResponseWriter,err error) {
 	w.Header().Set("content-type","text/plain")
 	w.Write([]byte(err.Error()))
 }
+
+
+
+func WsServerHooking() WsServerHook {
+
+}
