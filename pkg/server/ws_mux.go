@@ -31,16 +31,6 @@ type WsServerHook interface {
 
 
 
-
-
-
-
-
-
-
-
-
-
 type WsRequest struct {
 	Ip       net.IP
 	WsMethod int
@@ -54,6 +44,8 @@ type wsServeMux struct {
 	urlSet   b64set.Set
 	urlCtx   map[[64]byte]context.Context
 }
+
+
 
 func newWsServeMux() *wsServeMux {
 	var wss = &wsServeMux{}
