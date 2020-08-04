@@ -1,4 +1,4 @@
-package server
+package ws_mux
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"ccloud_hdd_server/pkg/data"
-	ws_service "ccloud_hdd_server/pkg/server/ws"
 	"ccloud_hdd_server/pkg/util"
 
 	"github.com/gorilla/websocket"
@@ -40,18 +39,25 @@ type WsRequest struct {
 }
 
 type wsServeMux struct {
-	services map[int]ws_service.Thread
+	services map[int]Thread
 	urlSet   b64set.Set
 	urlCtx   map[[64]byte]context.Context
 }
 
 
 
-func newWsServeMux() *wsServeMux {
+var ws_mux = func() *wsServeMux {
 	var wss = &wsServeMux{}
-	wss.services[WsSER] = ws_service.NewServThread()
-	wss.services[WsUPLOAD] = ws_service.NewUploadThread()
+	wss.services = make(map[int]Thread)
+	wss.urlCtx = make(map[[64]byte]context.Context)
+
+	wss.services[WsSER] = newServThread()
+	wss.services[WsUPLOAD] = newUploadThread()
 	return wss
+}()
+
+func GetWsMux() *wsServeMux {
+	return ws_mux
 }
 
 func (wss *wsServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -87,13 +93,13 @@ func (wss *wsServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	lwg := new(sync.WaitGroup)
 	lwg.Add(1)
-	wss.awaitServiceCtx(ws_method, &ws_service.WsServiceCtx{
+	wss.awaitServiceCtx(ws_method, &WsServiceCtx{
 		Conn: conn,
 		Obj:  ctx.Value("object").(*data.Object),
 		Wg:   lwg,
 		Args: ctx.Value("args").(context.Context),
 	})
-
+	
 }
 
 func (wss *wsServeMux) checkHttpVal(r *http.Request) (context.Context, int, error) {
@@ -112,7 +118,7 @@ func (wss *wsServeMux) checkHttpVal(r *http.Request) (context.Context, int, erro
 	}
 	return ctx, 0, nil
 }
-func (wss *wsServeMux) awaitServiceCtx(method int, wlc *ws_service.WsServiceCtx) {
+func (wss *wsServeMux) awaitServiceCtx(method int, wlc *WsServiceCtx) {
 	wss.services[method].Push(wlc)
 	wlc.Wg.Wait()
 }
