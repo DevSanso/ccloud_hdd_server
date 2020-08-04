@@ -17,5 +17,8 @@ func (*_HashDecryption)second() hash.Hash {
 var _hd = _HashDecryption{}
 
 func Sum(b []byte) []byte {
-	return _hd.second().Sum(_hd.first().Sum(b))
+	f,s := _hd.first(),_hd.second()
+	f.Write(b)
+	s.Write(f.Sum(nil))
+	return s.Sum(nil)
 }
