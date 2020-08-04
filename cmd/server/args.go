@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strconv"
 	"encoding/json"
 	"flag"
 	"io/ioutil"
@@ -27,6 +28,15 @@ type Config struct {
 		Passwd string
 		DbName string
 	}
+}
+
+func (cfg *Config)DbSource() string {
+	h := cfg.DbConfig.Host
+	p := strconv.Itoa(cfg.DbConfig.Port)
+	u := cfg.DbConfig.User
+	pass := cfg.DbConfig.Passwd
+	dbName := cfg.DbConfig.DbName
+	return u + ":" + pass + "@tcp("+h + ":" + p+")/" + dbName
 }
 
 

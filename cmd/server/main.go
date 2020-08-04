@@ -10,7 +10,11 @@ import (
 
 
 func HttpServer(addr string) *http.Server {
-	http_server := &http.Server{Addr : addr ,Handler : nil}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/login",loginHandler)
+	mux.HandleFunc("/logout",logoutHandler)
+	mux.HandleFunc("/work",workHandler)
+	http_server := &http.Server{Addr : addr ,Handler : mux}
 	return http_server
 }
 
@@ -19,13 +23,13 @@ func WsServer(addr string) *http.Server {
 	return ws_server
 }
 func sAddr(host string,port int) string {
-	
 	return host + ":" + strconv.Itoa(port)
 }
 
 func main() {
 	cfg := GetConfig()
-	dberr := get_db.OpenDb("mysql","")
+	dberr := get_db.OpenDb("mysql",cfg.DbSource())
+
 	if dberr != nil {panic(dberr)}
 	
 	certf,keyf := cfg.CertFile,cfg.KeyFile
