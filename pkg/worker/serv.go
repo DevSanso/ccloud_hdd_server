@@ -1,11 +1,8 @@
 package worker
 
 import (
-	"bytes"
-	
 	"context"
 	"database/sql"
-	"encoding/json"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -19,8 +16,7 @@ import (
 	"ccloud_hdd_server/pkg/db_sql"
 	"ccloud_hdd_server/pkg/file"
 	"ccloud_hdd_server/pkg/get_db"
-	servers "ccloud_hdd_server/pkg/server"
-	ws_service "ccloud_hdd_server/pkg/server/ws"
+	"ccloud_hdd_server/pkg/ws_mux"
 	db_user "ccloud_hdd_server/pkg/db_sql/user"
 	pkg_internal "ccloud_hdd_server/pkg/worker/internal"
 )
@@ -110,13 +106,13 @@ type wsFileFormat struct {
 }
 
 func (fvs *FileDataServ)wsHook(ip net.IP,obj *data.Object, h *db_sql.Header) [64]byte{
-	var req = new(servers.WsRequest)
+	var req = new(ws_mux.WsRequest)
 	req.Ip = ip
 	req.Obj = obj
-	req.WsMethod = servers.WsSER
+	req.WsMethod = ws_mux.WsSER
 
 	req.Args = context.WithValue(context.Background(),
-	 ws_service.CtxIndex,&ws_service.WsFileApiFormat{
+	ws_mux.CtxIndex,&ws_mux.WsFileApiFormat{
 		h.Name(),
 		h.Size(),
 		0,
@@ -124,7 +120,7 @@ func (fvs *FileDataServ)wsHook(ip net.IP,obj *data.Object, h *db_sql.Header) [64
 		[]byte(""),
 	})
 
-	hook := servers.WsServerHooking()
+	hook := ws_mux.WsServerHooking()
 	return hook.RequestWsService(req)
 	
 }

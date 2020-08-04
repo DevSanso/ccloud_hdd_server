@@ -52,3 +52,17 @@ func authAndGetInfo(r *http.Request) (userkey int, dbConn *sql.Conn, iv []byte, 
 	err = nil
 	return
 }
+
+func GetWoker(url string) Worker {
+	switch url{
+	case "/view_dir":
+		return &ViewDir{}
+	case "/serve":
+		return &CreateFileWork{}
+	case "/create_dir":
+		return &CreateDirWork{}
+	case "/recive":
+		return &FileDataServ{}
+	}
+	return nil
+} 

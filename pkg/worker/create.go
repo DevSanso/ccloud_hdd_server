@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"database/sql"
 	"net"
 	"net/http"
 	"os"
@@ -12,14 +11,12 @@ import (
 	"github.com/spf13/afero"
 
 	"ccloud_hdd_server/pkg/auth"
-	"ccloud_hdd_server/pkg/data"
 	"ccloud_hdd_server/pkg/db_sql"
 	db_user "ccloud_hdd_server/pkg/db_sql/user"
 	"ccloud_hdd_server/pkg/file"
 	"ccloud_hdd_server/pkg/get_db"
-	servers "ccloud_hdd_server/pkg/server"
-	ws_service "ccloud_hdd_server/pkg/server/ws"
 	pkg_internal "ccloud_hdd_server/pkg/worker/internal"
+	"ccloud_hdd_server/pkg/ws_mux"
 )
 
 const DataToKenSize = 4096
@@ -27,15 +24,14 @@ const DataToKenSize = 4096
 type CreateFileWork struct{}
 
 func (cfw *CreateFileWork) Do(w http.ResponseWriter, r *http.Request, key []byte) {
-	
 
 	uk, db_conn, iv, base_path, setting_err := authAndGetInfo(r)
 	if setting_err != nil {
 		pkg_internal.RawErrorResponse(w, setting_err, 400)
 	}
-	base_id,db_err := db_user.GetBasePathId(db_conn,uk)
+	base_id, db_err := db_user.GetBasePathId(db_conn, uk)
 	if db_err != nil {
-		pkg_internal.RawErrorResponse(w,db_err, 500)
+		pkg_internal.RawErrorResponse(w, db_err, 500)
 	}
 	dir := r.Form.Get("subDir")
 	name := r.Form.Get("name")
@@ -48,22 +44,21 @@ func (cfw *CreateFileWork) Do(w http.ResponseWriter, r *http.Request, key []byte
 		return
 	}
 
-
-	hook := servers.WsServerHooking()
-	var req = new(servers.WsRequest)
+	hook := ws_mux.WsServerHooking()
+	var req = new(ws_mux.WsRequest)
 	h, _, _ := net.SplitHostPort(r.RemoteAddr)
 	r_ip := net.ParseIP(h)
 	req.Ip = r_ip
 	req.Obj = obj
-	req.WsMethod = servers.WsUPLOAD
+	req.WsMethod = ws_mux.WsUPLOAD
 	req.Args = func() context.Context {
 		origin := context.Background()
 		format := context.WithValue(origin,
-			ws_service.CtxIndex,&ws_service.WsFileApiFormat{})
-		db_c := context.WithValue(format,"db-conn",db_conn)
-		n := context.WithValue(db_c,"origin-name",name)
-		
-		return context.WithValue(n,"cfg",db_sql.ObjectConfig{
+			ws_mux.CtxIndex, &ws_mux.WsFileApiFormat{})
+		db_c := context.WithValue(format, "db-conn", db_conn)
+		n := context.WithValue(db_c, "origin-name", name)
+
+		return context.WithValue(n, "cfg", db_sql.ObjectConfig{
 			base_id,
 			dir,
 			DataToKenSize,
@@ -73,19 +68,18 @@ func (cfw *CreateFileWork) Do(w http.ResponseWriter, r *http.Request, key []byte
 	}()
 	url_key := hook.RequestWsService(req)
 
-	w.Header().Set("content-type","text/plain")
+	w.Header().Set("content-type", "text/plain")
 	w.Write(url_key[:])
 	w.WriteHeader(204)
 
 }
 
-type fileDataReq struct{
-	Name string
-	SubDir string
-	D []byte
+type fileDataReq struct {
+	Name        string
+	SubDir      string
+	D           []byte
 	IsExistNext bool
 }
-
 
 type CreateDirWork struct{}
 
