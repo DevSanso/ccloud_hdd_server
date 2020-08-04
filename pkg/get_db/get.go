@@ -17,6 +17,3 @@ func GetDbConn(ctx context.Context) (*sql.Conn,error) {
 	return db.Conn(ctx)
 }
 
-func DbInit()  {
-
-}
