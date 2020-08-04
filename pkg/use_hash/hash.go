@@ -18,7 +18,18 @@ var _hd = _HashDecryption{}
 
 func Sum(b []byte) []byte {
 	f,s := _hd.first(),_hd.second()
-	f.Write(b)
-	s.Write(f.Sum(nil))
+	f.Write(activeBlockSize(b,f));f_b := f.Sum(nil)
+	s.Write(activeBlockSize(f_b,s))
 	return s.Sum(nil)
+}
+
+func activeBlockSize(b []byte,h hash.Hash) []byte {
+	max := h.BlockSize()
+	if len(b) > max {
+		return b[:max-1]
+	}else if len(b) < max {
+		empty := make([]byte,max-len(b))
+		return append(b,empty...)
+	}
+	return b
 }
